@@ -4,30 +4,21 @@ from django.shortcuts import render,render_to_response
 from django.db import models
 from django.http import HttpResponseRedirect,HttpResponse
 from elasticsearch import Elasticsearch
+from pyspark import SparkContext
 
-es =Elasticsearch (["127.0.0.1:9200"])
-stockdict={}
-
-
+import sys
 import csv
 import pandas as pd
 import numpy as np
 import sklearn.preprocessing
 import math
-
-from pyspark import SparkContext, SparkConf
-from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel, Rating
+es =Elasticsearch (["127.0.0.1:9200"])
+#from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel, Rating
 ##similarity recommendation
 ##从价格绝对值，趋势相对值，来算一个时间段内，表现相似度极高的股票。similarity的值
 ##从选择的股票去推荐相似的股票。
 ###这个是：target值 每天对比差值
 ###end of date = 2016.4.1 for testdata
-
-Target_Ticker=" "
-global similarity_length
-global target
-global reocommend_number
-
 
 def get_df_close_data(filename):
     if (filename == Target_Ticker):
@@ -151,41 +142,31 @@ def get_Srecommend_stock_list(similarity, number):
 
 def Similarity_Rec():
     ### Initiate the case
-    rdd_ticker = sc.textFile("file:/Users/nancywu/sparkhadoop/datatest/Ticker_50.csv")
-    tickerlist = rdd_ticker.map(lambda f: f.split(",")).collect()
-    tickerlist.remove([Target_Ticker])
-    tmp_similarity=[]
-    ### do the calculation
-    for f in tickerlist:
-        try:
-            name = f[0]+".csv"
-            df = get_df_close_data(f[0])
-            tmp_similarity.append(cal_minute_bar_similarity(df))
-        except:
-            import traceback
-            traceback.print_exc()
-            print("No service for this stock")
-    print("=============res_df all cal done===============")
-    res_df= build_Srecommend_stock_report_all(tmp_similarity)
-    print("=============whole stock list recommend report_pass===============")
-    Srecommend_list = get_Srecommend_stock_list(res_df, recommend_number)
-    print ("==========Intereted Stock=================")
-    print (Target_Ticker)
-    print("=============recommendt_list_pass===============")
-    print (Srecommend_list)
-    #sc.parallelize(Srecommend_list).repartition(1).saveAsTextFile("file:/Users/nancywu/sparkhadoop/datatest_result/" + Target_Ticker+".rec")
-    #writeToElastic("predictvalue",es,name,output)
-    return Srecommend_list
-
-
-class stock():
-    def __init__(self,ticker, company,exchange, category, national, data):
-        self.ticker=ticker,
-        self.company=company,
-        self.exchange=exchange,
-        self.category=category,
-        self.national=national,
-        self.data=data
+        rdd_ticker = sc.textFile("file:/Users/nancywu/sparkhadoop/datatest/Ticker_50.csv")
+        tickerlist = rdd_ticker.map(lambda f: f.split(",")).collect()
+        tickerlist.remove([Target_Ticker])
+        tmp_similarity=[]
+        ### do the calculation
+        for f in tickerlist:
+            try:
+                name = f[0]+".csv"
+                df = get_df_close_data(f[0])
+                tmp_similarity.append(cal_minute_bar_similarity(df))
+            except:
+                import traceback
+                traceback.print_exc()
+                print("No service for this stock")
+        print("=============res_df all cal done===============")
+        res_df= build_Srecommend_stock_report_all(tmp_similarity)
+        print("=============whole stock list recommend report_pass===============")
+        Srecommend_list = get_Srecommend_stock_list(res_df, recommend_number)
+        print ("==========Intereted Stock=================")
+        print (Target_Ticker)
+        print("=============recommendt_list_pass===============")
+        print (Srecommend_list)
+        #sc.parallelize(Srecommend_list).repartition(1).saveAsTextFile("file:/Users/nancywu/sparkhadoop/datatest_result/" + Target_Ticker+".rec")
+        #writeToElastic("predictvalue",es,name,output)
+        return Srecommend_list
 
 
 # 表单_recommendation_stock_chart
@@ -196,10 +177,16 @@ def recommendation(request):
     #settings=[(u'spark.app.name', u'App'),(u'spark.cores.max',2)]
     #conf = SparkConf().setAll(settings)
     #sc = SparkContext(appName="app")
+    global Target_Ticker
+    global similarity_length
+    global target
+    global recommend_number
+    global sc
+    sc = SparkContext(appName="Retest")
     request.encoding="utf-8"
     if "q" in request.GET:
-        stock_ticker=request.GET["q"].encode("utf-8")
-        Target_Ticker=stock_ticker
+        ticker=request.GET["q"]
+        Target_Ticker=ticker
         similarity_length = 90
         #similarity_length: it is how long time the similarity you want to test
         recommend_number=6
